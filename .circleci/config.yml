@@ -38,7 +38,7 @@ commands:
               exit 1
             fi
             echo "Writing ${GO_VERSION} to <<parameters.go-version-file-path>>"
-            printf "%s" "$GO_VERSION" >> "<<parameters.go-version-file-path>>"
+            printf "%s" "${GO_VERSION}" >> <<parameters.go-version-file-path>>
 
 jobs:
   verify:
