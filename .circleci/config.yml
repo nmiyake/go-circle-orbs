@@ -112,8 +112,13 @@ commands:
             GO_VERSION="$(cat <<parameters.go-version-file-path>>)"
             echo "GO_VERSION=${GO_VERSION}"
 
-            sudo rm -rf /usr/local/go
-            sudo ln -s /go/go-dists/${GO_VERSION} /usr/local/go
+            if ! command -v sudo &> /dev/null; then
+              sudo rm -rf /usr/local/go
+              sudo ln -s /go/go-dists/${GO_VERSION} /usr/local/go
+            else
+              rm -rf /usr/local/go
+              ln -s /go/go-dists/${GO_VERSION} /usr/local/go
+            fi
 
 jobs:
   verify:
