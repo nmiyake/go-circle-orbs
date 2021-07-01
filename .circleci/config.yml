@@ -48,7 +48,8 @@ jobs:
       - image: golang:1.16.5
     steps:
       - checkout
-      - write-go-version-file
+      - write-go-version-file:
+          go-version: go1.15.11
 
 workflows:
   version: 2
