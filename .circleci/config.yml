@@ -41,6 +41,42 @@ commands:
             echo "Writing ${GO_VERSION} to <<parameters.go-version-file-path>>"
             printf "%s" "$GO_VERSION" >> "<<parameters.go-version-file-path>>"
 
+  write-cache-key-file:
+    description: |
+      Writes a file at the location specified by the go-cache-file-path parameter that can be checksummed as part of a
+      CircleCI cache key to save and restore a Go distribution. The cache key content depends on whether or not the
+      required Go distribution is already present and the requested version of Go (which is specified as the content of
+      the file at the go-version-file-path parameter).
+    parameters:
+      go-cache-file-path:
+        description: |
+          Path at which the Go version file should be written.
+        type: string
+        default: "/go/circleci/circleci-cache-key-golang"
+      go-version-file-path:
+        description: |
+          Path at which the Go version file exists.
+        type: string
+        default: "/go/circleci/goversion"
+    steps:
+      - run:
+          name: Writing cache key for golang distribution
+          command: |
+            # set Go version
+            GO_VERSION="$(cat <<parameters.go-version-file-path>>)"
+            echo "GO_VERSION=${GO_VERSION}"
+
+            # write cache key. Content is based on whether or not required data is already present and the Go version.
+            mkdir -p "$(dirname <<parameters.go-cache-file-path>>)"
+            CACHE_KEY_FILE_CONTENT=""
+            if [ -d "/go/go-dists/${GO_VERSION}" ]; then
+              CACHE_KEY_FILE_CONTENT="Empty cache"
+            else
+              CACHE_KEY_FILE_CONTENT="${GO_VERSION}"
+            fi
+            echo "Writing cache key ${CACHE_KEY_FILE_CONTENT} to file <<parameters.go-cache-file-path>>"
+            echo "${CACHE_KEY_FILE_CONTENT}" > <<parameters.go-cache-file-path>>
+
   setup-cache:
     description: |
       Writes a file at the location specified by the go-version-file-path parameter that contains the version of Go that
@@ -129,9 +165,19 @@ jobs:
       - checkout
       - write-go-version-file:
           go-version: go1.15.11
+      - write-cache-key-file
+      - restore_cache:
+          name: Restore Go distribution from cache
+          keys:
+            - &golang-cache-key-verify v1-golang-verify-{{ checksum "/go/circleci/circleci-cache-key-golang" }}
       - setup-cache
       - setup-symlink
       - run: go version
+      - save_cache:
+          name: Save Go distribution to cache
+          key: *golang-cache-key-verify
+          paths:
+            - /go/circleci/go-dists
 
 workflows:
   version: 2
