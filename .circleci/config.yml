@@ -12,7 +12,7 @@ commands:
         description: |
           Path at which the Go version file should be written.
         type: string
-        default: "/go/circleci/goversion"
+        default: /go/circleci/goversion
       go-version:
         description: |
           If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
