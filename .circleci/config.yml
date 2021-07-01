@@ -95,6 +95,26 @@ commands:
             echo "Running go install std for darwin-arm64" && GOOS=darwin GOARCH=arm64 /go/go-dists/${GO_VERSION}/bin/go install std
             echo "Running go install std for windows-amd64" && GOOS=windows GOARCH=amd64 /go/go-dists/${GO_VERSION}/bin/go install std
 
+  setup-symlink:
+    description: |
+      Sets up a symlink from /usr/local/go -> /go/go-dists/${GO_VERSION}
+    parameters:
+      go-version-file-path:
+        description: |
+          Path at which the Go version file is expected.
+        type: string
+        default: "/go/circleci/goversion"
+    steps:
+      - run:
+          name: Set up symlink from /usr/local/go -> /go/go-dists/${GO_VERSION}
+          command: |
+            # set Go version
+            GO_VERSION="$(cat <<parameters.go-version-file-path>>)"
+            echo "GO_VERSION=${GO_VERSION}"
+
+            sudo rm -rf /usr/local/go
+            sudo ln -s /go/go-dists/${GO_VERSION} /usr/local/go
+
 jobs:
   verify:
     working_directory: /go/src/github.com/nmiyake/go-circle-orbs
@@ -105,6 +125,8 @@ jobs:
       - write-go-version-file:
           go-version: go1.15.11
       - setup-cache
+      - setup-symlink
+      - run: go version
 
 workflows:
   version: 2
