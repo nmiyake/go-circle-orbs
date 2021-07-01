@@ -169,7 +169,7 @@ jobs:
       - restore_cache:
           name: Restore Go distribution from cache
           keys:
-            - &golang-cache-key-verify v1-golang-verify-{{ checksum "/go/circleci/circleci-cache-key-golang" }}
+            - &golang-cache-key-verify v2-golang-verify-{{ checksum "/go/circleci/circleci-cache-key-golang" }}
       - setup-cache
       - setup-symlink
       - run: go version
