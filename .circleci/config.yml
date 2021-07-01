@@ -106,24 +106,24 @@ commands:
             if [ -d "/go/go-dists/${GO_VERSION}" ]; then
               echo "/go/go-dists/${GO_VERSION} exists: nothing to do"
               exit
-            elif [ -d "/go/circle-cache/go-dists/${GO_VERSION}" ]; then
+            elif [ -d "/go/circleci/go-dists/${GO_VERSION}" ]; then
               # Desired distribution restored from cache: move to expected location
-              echo "/go/go-dists/${GO_VERSION} does not exist, but /go/circle-cache/go-dists/${GO_VERSION} exists: move to expected location"
+              echo "/go/go-dists/${GO_VERSION} does not exist, but /go/circleci/go-dists/${GO_VERSION} exists: move to expected location"
               mkdir -p /go/go-dists
-              mv "/go/circle-cache/go-dists/${GO_VERSION}" "/go/go-dists/${GO_VERSION}"
+              mv "/go/circleci/go-dists/${GO_VERSION}" "/go/go-dists/${GO_VERSION}"
               exit
             fi
 
             # Desired distribution does not already exist and is not in cache: download and ensure that it exists in
             # location that will be cached and in expected location
-            echo "Neither /go/go-dists/${GO_VERSION} nor /go/circle-cache/go-dists/${GO_VERSION} exist"
+            echo "Neither /go/go-dists/${GO_VERSION} nor /go/circleci/go-dists/${GO_VERSION} exist"
             echo "Downloading golang distribution..." && wget -q <<parameters.go-dist-download-url-prefix>>${GO_VERSION}.linux-amd64.tar.gz
             echo "Expanding archive" && tar xf ${GO_VERSION}.linux-amd64.tar.gz
             echo "Removing archive" && rm ${GO_VERSION}.linux-amd64.tar.gz
-            echo "Creating /go/circle-cache/go-dists directory" && mkdir -p /go/circle-cache/go-dists
-            echo "Moving expanded Go distribution to /go/circle-cache/go-dists/${GO_VERSION}" && mv go /go/circle-cache/go-dists/${GO_VERSION}
+            echo "Creating /go/circleci/go-dists directory" && mkdir -p /go/circleci/go-dists
+            echo "Moving expanded Go distribution to /go/circleci/go-dists/${GO_VERSION}" && mv go /go/circleci/go-dists/${GO_VERSION}
             echo "Creating /go/go-dists directory" && mkdir -p /go/go-dists
-            echo "Copying expanded Go distribution to /go/go-dists/${GO_VERSION}" && cp -r /go/circle-cache/go-dists/${GO_VERSION} /go/go-dists/${GO_VERSION}
+            echo "Copying expanded Go distribution to /go/go-dists/${GO_VERSION}" && cp -r /go/circleci/go-dists/${GO_VERSION} /go/go-dists/${GO_VERSION}
             echo "Setting working directory to /go to ensure that 'install std' command doesn't use local go.mod file" && cd /go
             echo "Running go install std for linux-amd64" && GOOS=linux GOARCH=amd64 /go/go-dists/${GO_VERSION}/bin/go install std
             echo "Running go install std for linux-arm64" && GOOS=linux GOARCH=arm64 /go/go-dists/${GO_VERSION}/bin/go install std
