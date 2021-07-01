@@ -1,5 +1,45 @@
 version: 2.1
 
+commands:
+  write-go-version-file:
+    description: |
+      Writes a file at the location specified by the go-version-file-path parameter that contains the version of Go that
+      should be used by commands. If a non-empty version is specified as a parameter, that value is used. Otherwise, the
+      content of the file at .palantir/go-version or /usr/local/go/VERSION is used. If no parameter is specified and
+      none of these files exist, the command fails with an error.
+    parameters:
+      go-version-file-path:
+        description: |
+          Path at which the Go version file should be written.
+        type: string
+        default: "/go/circleci/goversion"
+      go-version:
+        description: |
+          If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
+          version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: Writing go version to use in CircleCI job
+          command: |
+            # set Go version
+            GO_VERSION="<<parameters.go-version>>"
+            if [ ! -z "$GO_VERSION" ]; then
+              echo "Go version specified as parameter is ${GO_VERSION}
+            elif [ -f ".palantir/go-version" ]; then
+              GO_VERSION=$(cat ".palantir/go-version")
+              echo "Go version specified in .palantir/go-version is ${GO_VERSION}"
+            elif [ -f "/usr/local/go/VERSION" ]; then
+              GO_VERSION=$(cat "/usr/local/go/VERSION")
+              echo "Go version specified in /usr/local/go/VERSION is ${GO_VERSION}"
+            else
+              echo "Error: Go version was not specified as a parameter and neither .palantir/go-version nor /usr/local/go/VERSION exist"
+              exit 1
+            fi
+            echo "Writing ${GO_VERSION} to <<parameters.go-version-file-path>>"
+            printf "%s" "$GO_VERSION" >> "<<parameters.go-version-file-path>>"
+
 jobs:
   verify:
     working_directory: /go/src/github.com/nmiyake/go-circle-orbs
@@ -7,7 +47,7 @@ jobs:
       - image: golang:1.16.5
     steps:
       - checkout
-      - run: echo "Hello, world!"
+      - write-go-version-file
 
 workflows:
   version: 2
