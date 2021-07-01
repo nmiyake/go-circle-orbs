@@ -37,6 +37,7 @@ commands:
               echo "Error: Go version was not specified as a parameter and neither .palantir/go-version nor /usr/local/go/VERSION exist"
               exit 1
             fi
+            mkdir -p "$(dirname <<parameters.go-version-file-path>>)"
             echo "Writing ${GO_VERSION} to <<parameters.go-version-file-path>>"
             printf "%s" "$GO_VERSION" >> "<<parameters.go-version-file-path>>"
 
