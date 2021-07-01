@@ -1,0 +1,16 @@
+version: 2.1
+
+jobs:
+  verify:
+    working_directory: /go/src/github.com/nmiyake/go-circle-orbs
+    docker:
+      - image: golang:1.16.5
+    steps:
+      - checkout
+      - run: echo "Hello, world!"
+
+workflows:
+  version: 2
+  verify-dist-publish:
+    jobs:
+      - verify
