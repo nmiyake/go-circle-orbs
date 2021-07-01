@@ -24,7 +24,7 @@ commands:
           name: Writing go version to use in CircleCI job
           command: |
             # set Go version
-            GO_VERSION="<<parameters.go-version>>"
+            GO_VERSION=<<parameters.go-version>>
             if [ ! -z "$GO_VERSION" ]; then
               echo "Go version specified as parameter is ${GO_VERSION}
             elif [ -f ".palantir/go-version" ]; then
@@ -37,7 +37,7 @@ commands:
               echo "Error: Go version was not specified as a parameter and neither .palantir/go-version nor /usr/local/go/VERSION exist"
               exit 1
             fi
-            echo "Writing ${GO_VERSION} to <<parameters.go-version-file-path>>"
+            echo "Writing ${GO_VERSION} to" <<parameters.go-version-file-path>>
             printf "%s" "${GO_VERSION}" >> <<parameters.go-version-file-path>>
 
 jobs:
