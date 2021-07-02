@@ -43,16 +43,20 @@ commands:
 
   write-cache-key-file:
     description: |
+      Preconditions:
+        * File that contains the go version (for example, "go1.16.5") must exist at the path specified by the parameter
+          "go-version-file-path"
+
       Writes a file at the location specified by the go-cache-file-path parameter that can be checksummed as part of a
       CircleCI cache key to save and restore a Go distribution. The cache key content depends on whether or not the
-      required Go distribution is already present and the requested version of Go (which is specified as the content of
-      the file at the go-version-file-path parameter).
+      required Go distribution is already present and the version of Go specified in the file at the
+      "go-version-file-path" parameter.
     parameters:
       go-cache-file-path:
         description: |
           Path at which the Go version file should be written.
         type: string
-        default: "/go/circleci/circleci-cache-key-golang"
+        default: "/go/circle/circleci-cache-key-golang"
       go-version-file-path:
         description: |
           Path at which the Go version file exists.
@@ -79,10 +83,19 @@ commands:
 
   setup-cache:
     description: |
-      Writes a file at the location specified by the go-version-file-path parameter that contains the version of Go that
-      should be used by commands. If a non-empty version is specified as a parameter, that value is used. Otherwise, the
-      content of the file at .palantir/go-version or /usr/local/go/VERSION is used. If no parameter is specified and
-      none of these files exist, the command fails with an error.
+      Preconditions:
+        * File that contains the go version (for example, "go1.16.5") must exist at the path specified by the parameter
+          "go-version-file-path"
+        * CircleCI cache restore step for Go distribution has already occurred
+
+      Ensures that the Go distribution for the version specified in the "go-version-file-path" parameter exists at
+      "/go/go-dists/${GO_VERSION}". If a directory already exists at this location (for example, because it is part of
+      the Docker base image), does nothing. Otherwise, if a directory exists at /go/circleci/go-dists/${GO_VERSION} (for
+      example, because it was restored there by the CircleCI cache restore operation), it is moved to the expected
+      location. If neither of those paths exist, the distribution is downloaded by appending the desired Go distribution
+      to the provided "go-dist-download-url-prefix" parameter, is expanded into "/go/circleci/go-dists/${GO_VERSION}"
+      and then copied to "/go/go-dists/${GO_VERSION}" (in this scenario, the directory is copied rather than moved so
+      that the CircleCI cache save operation will save the directory in "/go/circleci/go-dists/${GO_VERSION}").
     parameters:
       go-version-file-path:
         description: |
@@ -133,6 +146,11 @@ commands:
 
   setup-symlink:
     description: |
+      Preconditions:
+        * File that contains the go version (for example, "go1.16.5") must exist at the path specified by the parameter
+          "go-version-file-path"
+        * Go distribution for the version must exist at "/go/go-dists/${GO_VERSION}"
+
       Sets up a symlink from /usr/local/go -> /go/go-dists/${GO_VERSION}
     parameters:
       go-version-file-path:
@@ -156,6 +174,68 @@ commands:
               ln -s /go/go-dists/${GO_VERSION} /usr/local/go
             fi
 
+  setup-go-distribution:
+    description: |
+      Sets up the Go distribution for a CircleCI job. If the distribution does not already exist in the expected
+      location, it is retrieved and saved to the CircleCI cache.
+
+      By default, uses the version of Go specified in the ".palantir/go-version" or the "/usr/local/go/VERSION" file.
+      If a value is provided for the "go-version" parameter, then that version is used and no files are consulted. The
+      Go version should be specified in the manner that matches how versions are declared in a Go distribution's VERSION
+      file (for example, "go1.16.5").
+
+      The "cache-key" parameter can be used to customize the cache key. Jobs that can run in parallel should specify
+      unique "cache-key" values to ensure that there are no race conditions for cache save/restore opreations.
+    parameters:
+      go-version-file-path:
+        description: |
+          Path at which the Go version file should be written.
+        type: string
+        default: "/go/circleci/goversion"
+      go-version:
+        description: |
+          If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
+          version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
+        type: string
+        default: ""
+      cache-key:
+        description: |
+          String that is used as part of the cache key. Typically something like a job name.
+        type: string
+        default: ""
+      go-cache-file-path:
+        description: |
+          Path at which the Go version file should be written.
+        type: string
+        default: "/go/circle/circleci-cache-key-golang"
+      go-dist-download-url-prefix:
+        description: |
+          Prefix of the download URL that should be used to download the Golang distribution. The prefix is joined with
+          the desired Go distribution file (for example, "go1.16.5.linux-amd64.tar.gz").
+        type: string
+        default: "https://golang.org/dl/"
+    steps:
+      - write-go-version-file:
+          go-version-file-path: <<parameters.go-version-file-path>>
+          go-version: <<parameters.go-version>>
+      - write-cache-key-file:
+          go-cache-file-path: <<parameters.go-cache-file-path>>
+      - restore_cache:
+          name: Restore Go distribution from cache
+          keys:
+            - &golang-cache-key v3-golang-<<parameters.cache-key>>-{{ checksum <<parameters.go-cache-file-path>> }}
+      - setup-cache:
+          go-version-file-path: <<parameters.go-version-file-path>>
+          go-dist-download-url-prefix: <<parameters.go-dist-download-url-prefix>>
+      - setup-symlink:
+          go-version-file-path: <<parameters.go-version-file-path>>
+      - run: go version
+      - save_cache:
+          name: Save Go distribution to cache
+          key: *golang-cache-key
+          paths:
+            - /go/circleci/go-dists
+
 jobs:
   verify:
     working_directory: /go/src/github.com/nmiyake/go-circle-orbs
@@ -163,24 +243,21 @@ jobs:
       - image: golang:1.16.5
     steps:
       - checkout
-      - write-go-version-file:
-          go-version: go1.15.11
-      - write-cache-key-file
-      - restore_cache:
-          name: Restore Go distribution from cache
-          keys:
-            - &golang-cache-key-verify v2-golang-verify-{{ checksum "/go/circleci/circleci-cache-key-golang" }}
-      - setup-cache
-      - setup-symlink
-      - run: go version
-      - save_cache:
-          name: Save Go distribution to cache
-          key: *golang-cache-key-verify
-          paths:
-            - /go/circleci/go-dists
+      - setup-go-distribution
+      - run: echo "Verify task"
+  dist:
+    working_directory: /go/src/github.com/nmiyake/go-circle-orbs
+    docker:
+      - image: golang:1.16.5
+    steps:
+      - checkout
+      - setup-go-distribution:
+          go-version: 1.15.11
+      - run: echo "Dist task"
 
 workflows:
   version: 2
   verify-dist-publish:
     jobs:
       - verify
+      - dist
