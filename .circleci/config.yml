@@ -130,7 +130,7 @@ commands:
             # Desired distribution does not already exist and is not in cache: download and ensure that it exists in
             # location that will be cached and in expected location
             echo "Neither /go/go-dists/${GO_VERSION} nor /go/circleci/go-dists/${GO_VERSION} exist"
-            echo "Downloading golang distribution..." && wget -q <<parameters.go-dist-download-url-prefix>>${GO_VERSION}.linux-amd64.tar.gz
+            echo "Downloading golang distribution from <<parameters.go-dist-download-url-prefix>>${GO_VERSION}.linux-amd64.tar.gz..." && wget -q <<parameters.go-dist-download-url-prefix>>${GO_VERSION}.linux-amd64.tar.gz
             echo "Expanding archive" && tar xf ${GO_VERSION}.linux-amd64.tar.gz
             echo "Removing archive" && rm ${GO_VERSION}.linux-amd64.tar.gz
             echo "Creating /go/circleci/go-dists directory" && mkdir -p /go/circleci/go-dists
@@ -223,7 +223,7 @@ commands:
       - restore_cache:
           name: Restore Go distribution from cache
           keys:
-            - &golang-cache-key v3-golang-<<parameters.cache-key>>-{{ checksum <<parameters.go-cache-file-path>> }}
+            - &golang-cache-key v3-golang-<<parameters.cache-key>>-{{ checksum "<<parameters.go-cache-file-path>>" }}
       - setup-cache:
           go-version-file-path: <<parameters.go-version-file-path>>
           go-dist-download-url-prefix: <<parameters.go-dist-download-url-prefix>>
@@ -252,7 +252,7 @@ jobs:
     steps:
       - checkout
       - setup-go-distribution:
-          go-version: 1.15.11
+          go-version: go1.15.11
       - run: echo "Dist task"
 
 workflows:
