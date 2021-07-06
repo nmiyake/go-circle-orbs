@@ -1,255 +1,7 @@
 version: 2.1
 
-commands:
-  write-go-version-file:
-    description: |
-      Writes a file at the location specified by the "go-version-file-path" parameter that contains the version of Go
-      that should be used by commands. If a non-empty version is specified using the "go-version" parameter, that value
-      is used. Otherwise, the content of the file at .palantir/go-version or /usr/local/go/VERSION is used. If no
-      parameter is specified and none of these files exist, the command fails with an error.
-    parameters:
-      go-version:
-        description: |
-          If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
-          version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
-        type: string
-        default: ""
-      go-version-file-path:
-        description: |
-          Path at which the Go version file should be written.
-        type: string
-        default: "/go/circleci/goversion"
-    steps:
-      - run:
-          name: Writing go version to use in CircleCI job
-          command: |
-            # this pattern is used to make it easier to port the code to CircleCI 2.0
-            PARAM_GO_VERSION="<<parameters.go-version>>"
-            PARAM_GO_VERSION_FILE_PATH="<<parameters.go-version-file-path>>"
-
-            # set Go version
-            GO_VERSION=${PARAM_GO_VERSION}
-            if [ ! -z "${GO_VERSION}" ]; then
-              echo "Go version specified as parameter is ${GO_VERSION}"
-            elif [ -f ".palantir/go-version" ]; then
-              GO_VERSION=$(cat ".palantir/go-version")
-              echo "Go version specified in .palantir/go-version is ${GO_VERSION}"
-            elif [ -f "/usr/local/go/VERSION" ]; then
-              GO_VERSION=$(cat "/usr/local/go/VERSION")
-              echo "Go version specified in /usr/local/go/VERSION is ${GO_VERSION}"
-            else
-              echo "Error: Go version was not specified as a parameter and neither .palantir/go-version nor /usr/local/go/VERSION exist"
-              exit 1
-            fi
-            mkdir -p "$(dirname ${PARAM_GO_VERSION_FILE_PATH})"
-            echo "Writing ${GO_VERSION} to ${PARAM_GO_VERSION_FILE_PATH}"
-            printf "%s" "$GO_VERSION" >> "${PARAM_GO_VERSION_FILE_PATH}"
-
-  write-cache-key-file:
-    description: |
-      Preconditions:
-        * File that contains the go version (for example, "go1.16.5") must exist at the path specified by the parameter
-          "go-version-file-path"
-
-      Writes a file at the location specified by the "go-cache-file-path" parameter that can be checksummed as part of a
-      CircleCI cache key to save and restore a Go distribution. The cache key content depends on whether or not the
-      required Go distribution is already present and the version of Go specified in the file at the
-      "go-version-file-path" parameter.
-    parameters:
-      go-version-file-path:
-        description: |
-          Path at which the Go version file exists.
-        type: string
-        default: "/go/circleci/goversion"
-      go-cache-file-path:
-        description: |
-          Path at which the Go version file should be written.
-        type: string
-        default: "/go/circle/circleci-cache-key-golang"
-    steps:
-      - run:
-          name: Writing cache key for golang distribution
-          command: |
-            # this pattern is used to make it easier to port the code to CircleCI 2.0
-            PARAM_GO_VERSION_FILE_PATH="<<parameters.go-version-file-path>>"
-            PARAM_GO_CACHE_FILE_PATH="<<parameters.go-cache-file-path>>"
-
-            # set Go version
-            GO_VERSION="$(cat ${PARAM_GO_VERSION_FILE_PATH})"
-            echo "GO_VERSION=${GO_VERSION}"
-
-            # write cache key. Content is based on whether or not required data is already present and the Go version.
-            mkdir -p "$(dirname ${PARAM_GO_CACHE_FILE_PATH})"
-            CACHE_KEY_FILE_CONTENT=""
-            if [ -d "/go/go-dists/${GO_VERSION}" ]; then
-              CACHE_KEY_FILE_CONTENT="Empty cache"
-            else
-              CACHE_KEY_FILE_CONTENT="${GO_VERSION}"
-            fi
-            echo "Writing cache key ${CACHE_KEY_FILE_CONTENT} to file ${PARAM_GO_CACHE_FILE_PATH}"
-            echo "${CACHE_KEY_FILE_CONTENT}" > "${PARAM_GO_CACHE_FILE_PATH}"
-
-  setup-cache:
-    description: |
-      Preconditions:
-        * File that contains the go version (for example, "go1.16.5") must exist at the path specified by the parameter
-          "go-version-file-path"
-        * CircleCI cache restore step for Go distribution has already occurred
-
-      Ensures that the Go distribution for the version specified in the "go-version-file-path" parameter exists at
-      "/go/go-dists/${GO_VERSION}". If a directory already exists at this location (for example, because it is part of
-      the Docker base image), does nothing. Otherwise, if a directory exists at /go/circleci/go-dists/${GO_VERSION} (for
-      example, because it was restored there by the CircleCI cache restore operation), it is moved to the expected
-      location. If neither of those paths exist, the distribution is downloaded by appending the desired Go distribution
-      to the provided "go-dist-download-url-prefix" parameter, is expanded into "/go/circleci/go-dists/${GO_VERSION}"
-      and then copied to "/go/go-dists/${GO_VERSION}" (in this scenario, the directory is copied rather than moved so
-      that the CircleCI cache save operation will save the directory in "/go/circleci/go-dists/${GO_VERSION}").
-    parameters:
-      go-version-file-path:
-        description: |
-          Path at which the Go version file is expected.
-        type: string
-        default: "/go/circleci/goversion"
-      go-dist-download-url-prefix:
-        description: |
-          Prefix of the download URL that should be used to download the Golang distribution. The prefix is joined with
-          the desired Go distribution file (for example, "go1.16.5.linux-amd64.tar.gz").
-        type: string
-        default: "https://golang.org/dl/"
-    steps:
-      - run:
-          name: Download go distribution and install standard libraries
-          command: |
-            # this pattern is used to make it easier to port the code to CircleCI 2.0
-            PARAM_GO_VERSION_FILE_PATH="<<parameters.go-version-file-path>>"
-            PARAM_GO_DIST_DOWNLOAD_URL_PREFIX="<<parameters.go-dist-download-url-prefix>>"
-
-            # set Go version
-            GO_VERSION="$(cat ${PARAM_GO_VERSION_FILE_PATH})"
-
-            # desired distribution already exists: nothing to do
-            if [ -d "/go/go-dists/${GO_VERSION}" ]; then
-              echo "/go/go-dists/${GO_VERSION} exists: nothing to do"
-              exit
-            elif [ -d "/go/circleci/go-dists/${GO_VERSION}" ]; then
-              # Desired distribution restored from cache: move to expected location
-              echo "/go/go-dists/${GO_VERSION} does not exist, but /go/circleci/go-dists/${GO_VERSION} exists: move to expected location"
-              mkdir -p /go/go-dists
-              mv "/go/circleci/go-dists/${GO_VERSION}" "/go/go-dists/${GO_VERSION}"
-              exit
-            fi
-
-            # Desired distribution does not already exist and is not in cache: download and ensure that it exists in
-            # location that will be cached and in expected location
-            echo "Neither /go/go-dists/${GO_VERSION} nor /go/circleci/go-dists/${GO_VERSION} exist"
-            echo "Downloading golang distribution from ${PARAM_GO_DIST_DOWNLOAD_URL_PREFIX}${GO_VERSION}.linux-amd64.tar.gz..." && wget -q ${PARAM_GO_DIST_DOWNLOAD_URL_PREFIX}${GO_VERSION}.linux-amd64.tar.gz
-            echo "Expanding archive" && tar xf ${GO_VERSION}.linux-amd64.tar.gz
-            echo "Removing archive" && rm ${GO_VERSION}.linux-amd64.tar.gz
-            echo "Creating /go/circleci/go-dists directory" && mkdir -p /go/circleci/go-dists
-            echo "Moving expanded Go distribution to /go/circleci/go-dists/${GO_VERSION}" && mv go /go/circleci/go-dists/${GO_VERSION}
-            echo "Creating /go/go-dists directory" && mkdir -p /go/go-dists
-            echo "Copying expanded Go distribution to /go/go-dists/${GO_VERSION}" && cp -r /go/circleci/go-dists/${GO_VERSION} /go/go-dists/${GO_VERSION}
-            echo "Setting working directory to /go to ensure that 'install std' command doesn't use local go.mod file" && cd /go
-            echo "Running go install std for linux-amd64" && GOOS=linux GOARCH=amd64 /go/go-dists/${GO_VERSION}/bin/go install std
-            echo "Running go install std for linux-arm64" && GOOS=linux GOARCH=arm64 /go/go-dists/${GO_VERSION}/bin/go install std
-            echo "Running go install std for darwin-amd64" && GOOS=darwin GOARCH=amd64 /go/go-dists/${GO_VERSION}/bin/go install std
-            echo "Running go install std for darwin-arm64" && GOOS=darwin GOARCH=arm64 /go/go-dists/${GO_VERSION}/bin/go install std
-            echo "Running go install std for windows-amd64" && GOOS=windows GOARCH=amd64 /go/go-dists/${GO_VERSION}/bin/go install std
-
-  setup-symlink:
-    description: |
-      Preconditions:
-        * File that contains the go version (for example, "go1.16.5") must exist at the path specified by the parameter
-          "go-version-file-path"
-        * Go distribution for the version must exist at "/go/go-dists/${GO_VERSION}"
-
-      Sets up a symlink from /usr/local/go -> /go/go-dists/${GO_VERSION}
-    parameters:
-      go-version-file-path:
-        description: |
-          Path at which the Go version file is expected.
-        type: string
-        default: "/go/circleci/goversion"
-    steps:
-      - run:
-          name: Set up symlink from /usr/local/go -> /go/go-dists/${GO_VERSION}
-          command: |
-            # this pattern is used to make it easier to port the code to CircleCI 2.0
-            PARAM_GO_VERSION_FILE_PATH="<<parameters.go-version-file-path>>"
-
-            # set Go version
-            GO_VERSION="$(cat ${PARAM_GO_VERSION_FILE_PATH})"
-            echo "GO_VERSION=${GO_VERSION}"
-
-            if command -v sudo &> /dev/null; then
-              sudo rm -rf /usr/local/go
-              sudo ln -s /go/go-dists/${GO_VERSION} /usr/local/go
-            else
-              rm -rf /usr/local/go
-              ln -s /go/go-dists/${GO_VERSION} /usr/local/go
-            fi
-
-  setup-go-distribution:
-    description: |
-      Sets up the Go distribution for a CircleCI job. If the distribution does not already exist in the expected
-      location, it is retrieved and saved to the CircleCI cache.
-
-      By default, uses the version of Go specified in the ".palantir/go-version" or the "/usr/local/go/VERSION" file.
-      If a value is provided for the "go-version" parameter, then that version is used and no files are consulted. The
-      Go version should be specified in the manner that matches how versions are declared in a Go distribution's VERSION
-      file (for example, "go1.16.5").
-
-      The "cache-key" parameter can be used to customize the cache key. Jobs that can run in parallel should specify
-      unique "cache-key" values to ensure that there are no race conditions for cache save/restore opreations.
-    parameters:
-      go-version-file-path:
-        description: |
-          Path at which the Go version file should be written.
-        type: string
-        default: "/go/circleci/goversion"
-      go-version:
-        description: |
-          If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
-          version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
-        type: string
-        default: ""
-      cache-key:
-        description: |
-          String that is used as part of the cache key. Typically something like a job name.
-        type: string
-        default: ""
-      go-cache-file-path:
-        description: |
-          Path at which the Go version file should be written.
-        type: string
-        default: "/go/circle/circleci-cache-key-golang"
-      go-dist-download-url-prefix:
-        description: |
-          Prefix of the download URL that should be used to download the Golang distribution. The prefix is joined with
-          the desired Go distribution file (for example, "go1.16.5.linux-amd64.tar.gz").
-        type: string
-        default: "https://golang.org/dl/"
-    steps:
-      - write-go-version-file:
-          go-version-file-path: <<parameters.go-version-file-path>>
-          go-version: <<parameters.go-version>>
-      - write-cache-key-file:
-          go-cache-file-path: <<parameters.go-cache-file-path>>
-      - restore_cache:
-          name: Restore Go distribution from cache
-          keys:
-            - &golang-cache-key v3-golang-<<parameters.cache-key>>-{{ checksum "<<parameters.go-cache-file-path>>" }}
-      - setup-cache:
-          go-version-file-path: <<parameters.go-version-file-path>>
-          go-dist-download-url-prefix: <<parameters.go-dist-download-url-prefix>>
-      - setup-symlink:
-          go-version-file-path: <<parameters.go-version-file-path>>
-      - run: go version
-      - save_cache:
-          name: Save Go distribution to cache
-          key: *golang-cache-key
-          paths:
-            - /go/circleci/go-dists
+orbs:
+  go-dist: palantir/go-dist@0.0.1
 
 jobs:
   verify:
@@ -258,7 +10,8 @@ jobs:
       - image: golang:1.16.5
     steps:
       - checkout
-      - setup-go-distribution
+      - go-dist/setup-go-distribution:
+          cache-key: "verify"
       - run: echo "Verify task"
   dist:
     working_directory: /go/src/github.com/nmiyake/go-circle-orbs
@@ -266,13 +19,27 @@ jobs:
       - image: golang:1.16.5
     steps:
       - checkout
-      - setup-go-distribution:
+      - go-dist/setup-go-distribution:
+          cache-key: "dist"
           go-version: go1.15.11
       - run: echo "Dist task"
+  publish:
+    working_directory: /go/src/github.com/nmiyake/go-circle-orbs
+    docker:
+      - image: golang:1.16.5
+    steps:
+      - checkout
+      - go-dist/setup-go-distribution:
+          cache-key: "dist"
+          go-version: go1.15.11
+      - run: echo "Publish task"
 
 workflows:
   version: 2
-  verify-dist-publish:
+  verify-test-dist-publish:
     jobs:
       - verify
       - dist
+      - publish:
+          requires:
+            - dist
