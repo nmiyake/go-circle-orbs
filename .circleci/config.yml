@@ -14,8 +14,8 @@ executor: &executor
 version: 2.1
 
 orbs:
-  go: palantir/go@0.0.19
-  godel: palantir/godel@dev:develop-5a9fdf0673caae0e35e271d77ac5f1ec20cfdd6f
+  go: palantir/go@0.0.20
+  godel: palantir/godel@0.0.22
 
 all-tags-filter: &all-tags-filter
   filters:
