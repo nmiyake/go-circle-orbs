@@ -15,7 +15,7 @@ version: 2.1
 
 orbs:
   go: palantir/go@0.0.19
-  godel: palantir/godel@dev:develop-0b7e0e302417a95a066f1803344a67acf21fbb23
+  godel: palantir/godel@dev:develop-5a9fdf0673caae0e35e271d77ac5f1ec20cfdd6f
 
 all-tags-filter: &all-tags-filter
   filters:
