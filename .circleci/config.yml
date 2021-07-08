@@ -122,7 +122,7 @@ commands:
 
             # set Go version
             GO_VERSION="$(cat "${PARAM_GOPATH}/circleci/goversion")"
-            GO_DIST_DIR="${PARAM_GOPATH}/go-dists/${GO_VERSION}
+            GO_DIST_DIR="${PARAM_GOPATH}/go-dists/${GO_VERSION}"
             GO_DIST_CACHE_DIR="${PARAM_GOPATH}/circleci/go-dists/${GO_VERSION}"
 
             # desired distribution already exists: nothing to do
