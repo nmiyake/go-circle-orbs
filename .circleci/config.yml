@@ -245,7 +245,8 @@ jobs:
       - image: golang:1.16.5
     steps:
       - checkout
-      - setup-go-distribution
+      - setup-go-distribution:
+          cache-key: $CIRCLE_JOB
       - run: echo "Verify task"
   dist:
     working_directory: /go/src/github.com/nmiyake/go-circle-orbs
@@ -255,6 +256,7 @@ jobs:
       - checkout
       - setup-go-distribution:
           go-version: go1.15.11
+          cache-key: $CIRCLE_JOB
       - run: echo "Dist task"
   ci-image:
     working_directory: /home/circleci/go/src/github.com/nmiyake/go-circle-orbs
@@ -264,6 +266,7 @@ jobs:
       - checkout
       - setup-go-distribution:
           go-version: go1.15.11
+          cache-key: $CIRCLE_JOB
           gopath: /home/circleci/go
       - run: echo "Dist task"
 
