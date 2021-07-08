@@ -179,10 +179,10 @@ commands:
 
             if command -v sudo &> /dev/null; then
               sudo rm -rf /usr/local/go
-              sudo ln -s /go/go-dists/${GO_VERSION} /usr/local/go
+              sudo ln -s "${PARAM_GOPATH}/go-dists/${GO_VERSION}" /usr/local/go
             else
               rm -rf /usr/local/go
-              ln -s /go/go-dists/${GO_VERSION} /usr/local/go
+              ln -s "${PARAM_GOPATH}/go-dists/${GO_VERSION}" /usr/local/go
             fi
 
   setup-go-distribution:
