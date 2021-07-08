@@ -144,7 +144,7 @@ commands:
             echo "Downloading golang distribution from ${PARAM_GO_DIST_DOWNLOAD_URL_PREFIX}${GO_VERSION}.linux-amd64.tar.gz..." && wget -q "${PARAM_GO_DIST_DOWNLOAD_URL_PREFIX}${GO_VERSION}.linux-amd64.tar.gz"
             echo "Expanding archive" && tar xf "${GO_VERSION}.linux-amd64.tar.gz"
             echo "Removing archive" && rm "${GO_VERSION}.linux-amd64.tar.gz"
-            echo "Creating ${GO_DIST_CACHE_DIR}" && mkdir -p "${GO_DIST_CACHE_DIR}"
+            echo "Creating $(dirname "${GO_DIST_CACHE_DIR}")" && mkdir -p "$(dirname "${GO_DIST_CACHE_DIR}")"
             echo "Moving expanded Go distribution to ${GO_DIST_CACHE_DIR}" && mv go "${GO_DIST_CACHE_DIR}"
             echo "Creating ${PARAM_GOPATH}/go-dists directory" && mkdir -p "${PARAM_GOPATH}/go-dists"
             echo "Copying expanded Go distribution to ${GO_DIST_DIR}" && cp -r "${GO_DIST_CACHE_DIR}" "${GO_DIST_DIR}"
