@@ -149,11 +149,11 @@ commands:
             echo "Creating ${PARAM_GOPATH}/go-dists directory" && mkdir -p "${PARAM_GOPATH}/go-dists"
             echo "Copying expanded Go distribution to ${GO_DIST_DIR}" && cp -r "${GO_DIST_CACHE_DIR}" "${GO_DIST_DIR}"
             echo "Setting working directory to ${PARAM_GOPATH} to ensure that 'install std' command doesn't use local go.mod file" && cd "${PARAM_GOPATH}"
-            echo "Running go install std for linux-amd64" && GOOS=linux GOARCH=amd64 ${GO_DIST_DIR}/bin/go" install std
-            echo "Running go install std for linux-arm64" && GOOS=linux GOARCH=arm64 ${GO_DIST_DIR}/bin/go" install std
-            echo "Running go install std for darwin-amd64" && GOOS=darwin GOARCH=amd64 ${GO_DIST_DIR}/bin/go" install std
-            echo "Running go install std for darwin-arm64" && GOOS=darwin GOARCH=arm64 ${GO_DIST_DIR}/bin/go" install std
-            echo "Running go install std for windows-amd64" && GOOS=windows GOARCH=amd64 ${GO_DIST_DIR}/bin/go" install std
+            echo "Running go install std for linux-amd64" && GOOS=linux GOARCH=amd64 "${GO_DIST_DIR}/bin/go" install std
+            echo "Running go install std for linux-arm64" && GOOS=linux GOARCH=arm64 "${GO_DIST_DIR}/bin/go" install std
+            echo "Running go install std for darwin-amd64" && GOOS=darwin GOARCH=amd64 "${GO_DIST_DIR}/bin/go" install std
+            echo "Running go install std for darwin-arm64" && GOOS=darwin GOARCH=arm64 "${GO_DIST_DIR}/bin/go" install std
+            echo "Running go install std for windows-amd64" && GOOS=windows GOARCH=amd64 "${GO_DIST_DIR}/bin/go" install std
 
   setup-symlink:
     description: |
