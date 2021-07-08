@@ -1,6 +1,6 @@
 version: 2.1
 
-gopath-param: &gopath-param:
+gopath-param: &gopath-param
   gopath:
     description: |
       The $GOPATH value.
