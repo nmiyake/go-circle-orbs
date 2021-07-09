@@ -72,7 +72,7 @@ commands:
               exit 1
             fi
 
-            if (( PARAM_GO_PREV_VERSION_PARAM < 0 )); then
+            if (( PARAM_GO_PREV_VERSION_PARAM > 0 )); then
               GO_MINOR_VERSION=$(echo "${GO_VERSION}" | sed 's/^go[0-9][0-9]*\.\([0-9][0-9]*\).*$/\1/')
               if (( GO_MINOR_VERSION == 0 )); then
                 echo "Decrement operation not supported when minor version is 0"
