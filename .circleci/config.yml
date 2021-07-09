@@ -7,20 +7,42 @@ gopath-param: &gopath-param
     type: string
     default: "/go"
 
+go-version-param: &go-version-param
+  go-version:
+    description: |
+      If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
+      version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
+    type: string
+    default: ""
+
+go-version-file-param: &go-version-file-param
+  go-version-file:
+    description: |
+      The path to the file that specifies the version of Go that should be used for the project.
+    type: string
+    default: ".palantir/go-version"
+
+go-prev-version-param: &go-prev-version-param
+  go-prev-version:
+    description: |
+      If greater than 0, modifies the version of Go that would be used to be the first release of the version of Go that
+      is << parameters.go-prev-version >> minor versions smaller. For example, if the version of Go that would be used
+      is "go1.16.5" and << parameters.go-prev-version >> is 1, the version of Go that will be used will be "go1.15".
+      An error is raised if the subtraction would make the minor version less than 0.
+    type: integer
+    default: 0
+
 commands:
   write-go-version-file:
     description: |
       Writes a file at the location "<< parameters.gopath >>/circleci/goversion" that contains the version of Go that
       should be used by commands. If a non-empty version is specified using the "go-version" parameter, that value is
-      used. Otherwise, the content of the file at .palantir/go-version or /usr/local/go/VERSION is used. If no parameter
-      is specified and none of these files exist, the command fails with an error.
+      used. Otherwise, the content of the file at "<< parameters.go-version-file >>" or /usr/local/go/VERSION is used.
+      If no parameter is specified and none of these files exist, the command fails with an error.
     parameters:
-      go-version:
-        description: |
-          If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
-          version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
-        type: string
-        default: ""
+      <<: *go-version-param
+      <<: *go-version-file-param
+      <<: *go-prev-version-param
       <<: *gopath-param
     steps:
       - run:
@@ -28,24 +50,45 @@ commands:
           command: |
             # this pattern is used to make it easier to port the code to CircleCI 2.0
             PARAM_GO_VERSION="<< parameters.go-version >>"
+            PARAM_GO_VERSION_FILE="<< parameters.go-version-file >>"
+            PARAM_GO_PREV_VERSION_PARAM="<< parameters.go-prev-version >>"
             PARAM_GOPATH="<< parameters.gopath >>"
 
             GO_VERSION_FILE_PATH="${PARAM_GOPATH}/circleci/goversion"
+            FALLBACK_GO_VERSION_FILE="/usr/local/go/VERSION"
 
             # set Go version
             GO_VERSION=${PARAM_GO_VERSION}
             if [ ! -z "${GO_VERSION}" ]; then
               echo "Go version specified as parameter is ${GO_VERSION}"
-            elif [ -f ".palantir/go-version" ]; then
-              GO_VERSION=$(cat ".palantir/go-version")
-              echo "Go version specified in .palantir/go-version is ${GO_VERSION}"
-            elif [ -f "/usr/local/go/VERSION" ]; then
-              GO_VERSION=$(cat "/usr/local/go/VERSION")
-              echo "Go version specified in /usr/local/go/VERSION is ${GO_VERSION}"
+            elif [ -f "${PARAM_REPO_GO_VERSION_FILE}" ]; then
+              GO_VERSION=$(cat "${PARAM_REPO_GO_VERSION_FILE}")
+              echo "Go version specified in ${PARAM_REPO_GO_VERSION_FILE} is ${GO_VERSION}"
+            elif [ -f "${FALLBACK_GO_VERSION_FILE}" ]; then
+              GO_VERSION=$(cat "${FALLBACK_GO_VERSION_FILE}")
+              echo "Go version specified in ${FALLBACK_GO_VERSION_FILE} is ${GO_VERSION}"
             else
-              echo "Error: Go version was not specified as a parameter and neither .palantir/go-version nor /usr/local/go/VERSION exist"
+              echo "Error: Go version was not specified as a parameter and neither ${PARAM_REPO_GO_VERSION_FILE} nor ${FALLBACK_GO_VERSION_FILE} exist"
               exit 1
             fi
+
+            if (( PARAM_GO_PREV_VERSION_PARAM < 0 )); then
+              GO_MINOR_VERSION=$(echo "${GO_VERSION}" | sed 's/^go[0-9][0-9]*\.\([0-9][0-9]*\).*$/\1/')
+              if (( GO_MINOR_VERSION == 0 )); then
+                echo "Decrement operation not supported when minor version is 0"
+                exit 1
+              fi
+
+              (( GO_MINOR_VERSION = GO_MINOR_VERSION - DECREMENT_NUM ))
+              if (( GO_MINOR_VERSION < 0 )); then
+                echo "Minor version cannot be less than 0; was: ${GO_MINOR_VERSION}"
+                exit 1
+              fi
+
+              GO_MAJOR_VERSION=$(echo "${CURR_GO_VERSION}" | sed 's/^go\([0-9][0-9]*\).*$/\1/')
+              GO_VERSION="go${GO_MAJOR_VERSION}.${GO_MINOR_VERSION}"
+            fi
+
             mkdir -p "$(dirname "${GO_VERSION_FILE_PATH}")"
             echo "Writing ${GO_VERSION} to ${GO_VERSION_FILE_PATH}"
             printf "%s" "$GO_VERSION" > "${GO_VERSION_FILE_PATH}"
@@ -190,21 +233,18 @@ commands:
       Sets up the Go distribution for a CircleCI job. If the distribution does not already exist in the expected
       location, it is retrieved and saved to the CircleCI cache.
 
-      By default, uses the version of Go specified in the ".palantir/go-version" or the "/usr/local/go/VERSION" file.
-      If a value is provided for the "go-version" parameter, then that version is used and no files are consulted. The
-      Go version should be specified in the manner that matches how versions are declared in a Go distribution's VERSION
-      file (for example, "go1.16.5").
+      By default, uses the version of Go specified in the file at << parameters.go-version-file >> or the
+      "/usr/local/go/VERSION" file. If a value is provided for the "go-version" parameter, then that version is used and
+      no files are consulted. The Go version should be specified in the manner that matches how versions are declared in
+      a Go distribution's VERSION file (for example, "go1.16.5").
 
       The "cache-key" parameter can be used to customize the cache key. Jobs that can run in parallel should specify
       unique "cache-key" values to ensure that there are no race conditions for cache save/restore opreations.
     parameters:
       <<: *gopath-param
-      go-version:
-        description: |
-          If non-empty, this value is written as the Go version (files in the repository/image are not consulted). The
-          version should be of the form specified in a Go distribution's VERSION file (for example, "go1.16.5").
-        type: string
-        default: ""
+      <<: *go-version-param
+      <<: *go-version-file-param
+      <<: *go-prev-version-param
       cache-key:
         description: |
           String that is used as part of the cache key. Typically something like a job name.
@@ -219,13 +259,15 @@ commands:
     steps:
       - write-go-version-file:
           go-version: << parameters.go-version >>
+          go-version-file: << parameters.go-version-file >>
+          go-prev-version: << parameters.go-prev-version >>
           gopath: << parameters.gopath >>
       - write-cache-key-file:
           gopath: << parameters.gopath >>
       - restore_cache:
           name: Restore Go distribution from cache
           keys:
-            - &golang-cache-key v3-golang-<< parameters.cache-key >>-{{ checksum "<< parameters.gopath >>/circleci/circleci-cache-key-golang" }}
+            - &golang-cache-key v4-golang-<< parameters.cache-key >>-{{ checksum "<< parameters.gopath >>/circleci/circleci-cache-key-golang" }}
       - setup-cache:
           gopath: << parameters.gopath >>
           go-dist-download-url-prefix: << parameters.go-dist-download-url-prefix >>
@@ -255,7 +297,7 @@ jobs:
     steps:
       - checkout
       - setup-go-distribution:
-          go-version: go1.15.11
+          go-prev-version: 1
           cache-key: dist
       - run: echo "Dist task"
   ci-image:
@@ -265,7 +307,7 @@ jobs:
     steps:
       - checkout
       - setup-go-distribution:
-          go-version: go1.15.11
+          go-prev-version: 1
           cache-key: ci-image
           gopath: /home/circleci/go
       - run: echo "Dist task"
